@@ -1,0 +1,96 @@
+API Structure (Role-wise)
+Now the full API planning:
+
+********** Auth — Public routes (no token required) **********
+POST        /auth/otp/send                          Send OTP to mobile number
+POST        /auth/otp/verify                        Verify OTP → mark mobile verified
+POST        /auth/register/patient                  Register patient (email, mobile, name)
+POST        /auth/login                             Login for all roles → returns JWT
+POST        /auth/logout                            Invalidate token / session
+
+
+**********Super Admin routes**********
+User management
+GET         /super-admin/users                      List all doctors and executives
+POST        /super-admin/users                      Create doctor or executive account
+GET         /super-admin/users/:id                  Get single user detail
+PUT         /super-admin/users/:id                  Update user info or role
+PATCH       /super-admin/users/:id/toggle           Activate / deactivate user account
+DELETE      /super-admin/users/:id                  Delete user
+
+
+**********Doctor (Admin) routes**********
+Profile
+GET         /doctor/profile                        Get own profile
+PUT         /doctor/profile                        Update own profile info
+PATCH       /doctor/profile/password               Change password
+
+Slots
+GET         /doctor/slots                          List own slots (filter by date)
+POST        /doctor/slots                          Create one or multiple slots for a day
+PUT         /doctor/slots/:id                      Update slot (time, max capacity)
+DELETE      /doctor/slots/:id                      Delete / disable a slot
+
+Appointments & Patients
+GET         /doctor/appointments                   List appointments (filter by date)
+GET         /doctor/appointments/:id/patient       View patient profile + history
+GET         /doctor/appointments/:id/prescriptions View all past prescriptions for patient
+GET         /doctor/appointments/:id/reports       View all reports for patient
+POST        /doctor/appointments/:id/prescription  Create new prescription for this visit
+
+
+**********Patient routes**********
+Profile
+GET         /patient/profile                       Get own profile
+PUT         /patient/profile                       Update name, age, gender, height, weight
+
+Doctors & Slots
+GET         /patient/doctors                       List all active doctors
+GET         /patient/doctors/:id/slots             List available slots for a doctor (by date)
+
+Appointments
+POST        /patient/appointments                  Book an appointment on a slot
+GET         /patient/appointments                  View own appointment history
+DELETE      /patient/appointments/:id              Cancel an appointment
+
+Health Records
+GET         /patient/prescriptions                 View all own prescriptions
+GET         /patient/reports                       View all own uploaded reports
+
+
+**********Executive routes*************
+Profile
+GET          /executive/profile                    Get own profile
+PUT          /executive/profile                    Update own profile
+PATCH        /executive/profile/password           Change password
+
+New Appointments
+POST         /executive/walkin/otp/send           Send OTP to walk-in patient's mobile. Body: { name, email, mobile }
+POST         /executive/walkin/otp/verify         Verify OTP → returns patient_verified_token or resolves existing patient by mobile
+POST         /executive/walkin/book               Book appointment for verified walk-in. Body: { patient_verified_token, slot_id, doctor_id, date }. Sets booked_by = executive.id
+
+Appointments
+GET          /executive/appointments                  List all appointments date-wise
+PATCH        /executive/appointments/:id/attendance   Mark patient present or absent
+
+Patient Management
+GET          /executive/patients/:id                  View a patient's profile
+PUT          /executive/patients/:id/profile          Update patient profile details
+
+Reports
+POST         /executive/patients/:id/reports          Upload report file for a patient
+GET          /executive/patients/:id/reports          List all reports for a patient
+DELETE       /executive/reports/:id                   Delete an uploaded report
+
+
+
+Key Design Decisions to Note
+Authentication flow — All routes except auth/public ones require a JWT bearer token. Middleware reads the role claim from the token and enforces access. A single /auth/login endpoint works for all roles.
+
+OTP flow — Patient registration is a 3-step process: (1) POST /auth/otp/send with mobile, (2) POST /auth/otp/verify → marks mobile verified in otp_verifications, (3) POST /auth/register/patient with all details. The register endpoint checks that the mobile was recently verified before creating the user.
+
+Slot capacity enforcement — When a patient books via POST /patient/appointments, the backend checks: COUNT(appointments WHERE slot_id = X AND status != 'cancelled') < doctor_slots.max_appointments. This prevents overbooking.
+
+Report file handling — POST /executive/patients/:id/reports is a multipart/form-data request. The server stores the file (local disk or cloud storage), saves the path in the reports table, and returns the metadata.
+
+Separation of patient_id and doctor_id on prescriptions — Even though both can be derived from the appointment, having them directly on the prescriptions table makes querying history much faster without always joining through appointments.

@@ -1,0 +1,127 @@
+CREATE DATABASE IF NOT EXISTS hospital_db
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE hospital_db;
+
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  mobile VARCHAR(15) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('super_admin', 'admin', 'executive', 'patient') NOT NULL,
+  is_verified TINYINT(1) NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_users_email (email),
+  UNIQUE KEY uq_users_mobile (mobile),
+  INDEX idx_users_role (role)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS patient_profiles (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  gender ENUM('male', 'female', 'other') DEFAULT NULL,
+  age TINYINT UNSIGNED DEFAULT NULL,
+  height_cm DECIMAL(5, 2) DEFAULT NULL,
+  weight_kg DECIMAL(5, 2) DEFAULT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_patient_profiles_user (user_id),
+  CONSTRAINT fk_pp_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS doctor_slots (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  doctor_id BIGINT UNSIGNED NOT NULL,
+  slot_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  max_appointments TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_ds_doctor_date (doctor_id, slot_date),
+  CONSTRAINT fk_ds_doctor FOREIGN KEY (doctor_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS appointments (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  patient_id BIGINT UNSIGNED NOT NULL,
+  slot_id BIGINT UNSIGNED NOT NULL,
+  doctor_id BIGINT UNSIGNED NOT NULL,
+  booked_by BIGINT UNSIGNED NOT NULL,
+  appointment_date DATE NOT NULL,
+  status ENUM('booked', 'cancelled', 'completed') NOT NULL DEFAULT 'booked',
+  is_present TINYINT(1) DEFAULT NULL,
+  booked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_appt_patient (patient_id),
+  INDEX idx_appt_doctor_date (doctor_id, appointment_date),
+  INDEX idx_appt_slot (slot_id),
+  INDEX idx_appt_booked_by (booked_by),
+  CONSTRAINT fk_appt_patient FOREIGN KEY (patient_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_appt_slot FOREIGN KEY (slot_id) REFERENCES doctor_slots (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_appt_doctor FOREIGN KEY (doctor_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_appt_booked_by FOREIGN KEY (booked_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS prescriptions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  appointment_id BIGINT UNSIGNED NOT NULL,
+  doctor_id BIGINT UNSIGNED NOT NULL,
+  patient_id BIGINT UNSIGNED NOT NULL,
+  notes TEXT DEFAULT NULL,
+  medicines TEXT DEFAULT NULL,
+  prescription_date DATETIME NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_prescription_appointment (appointment_id),
+  CONSTRAINT fk_rx_appointment FOREIGN KEY (appointment_id) REFERENCES appointments (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_rx_doctor FOREIGN KEY (doctor_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_rx_patient FOREIGN KEY (patient_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS reports (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  patient_id BIGINT UNSIGNED NOT NULL,
+  uploaded_by BIGINT UNSIGNED NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  file_path VARCHAR(500) NOT NULL,
+  file_type VARCHAR(50) NOT NULL,
+  report_date DATETIME NOT NULL,
+  uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_rpt_patient FOREIGN KEY (patient_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_rpt_uploader FOREIGN KEY (uploaded_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS otp_verifications (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  mobile VARCHAR(15) NOT NULL,
+  otp_code VARCHAR(10) NOT NULL,
+  is_used TINYINT(1) NOT NULL DEFAULT 0,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_otp_mobile (mobile),
+  INDEX idx_otp_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS health_reports (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  patient_id BIGINT UNSIGNED NOT NULL,
+  created_by BIGINT UNSIGNED NOT NULL,
+  report_date DATETIME NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  tests JSON NOT NULL,
+  notes TEXT DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_hr_patient FOREIGN KEY (patient_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_hr_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
