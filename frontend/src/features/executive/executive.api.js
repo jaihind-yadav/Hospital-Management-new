@@ -84,6 +84,11 @@ export const executivePatientHealthReportsApi = async (patientId) => {
   return data;
 };
 
+export const executivePatientPrescriptionsApi = async (patientId) => {
+  const { data } = await axiosClient.get(`/executive/patients/${patientId}/prescriptions`);
+  return data;
+};
+
 export const uploadPatientReportApi = async (patientId, file, reportDate) => {
   const formData = new FormData();
   formData.append("file", file);

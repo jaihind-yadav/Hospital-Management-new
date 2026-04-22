@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import AppShell from "../components/AppShellReference";
 import DataTable from "../components/DataTable";
 import Modal from "../components/ModalEnhanced";
+import PrescriptionDetailModal from "../components/PrescriptionDetailModal";
 import ReportDetailModal from "../components/ReportDetailModal";
 import {
   changeExecutivePasswordApi,
@@ -15,6 +16,7 @@ import {
   executivePatientsApi,
   executivePatientHealthReportsApi,
   executivePatientApi,
+  executivePatientPrescriptionsApi,
   executivePatientReportsApi,
   executiveProfileApi,
   markAttendanceApi,
@@ -54,7 +56,9 @@ const ExecutivePage = ({ section = "attendance" }) => {
   const [patient, setPatient] = useState(null);
   const [reports, setReports] = useState([]);
   const [healthReports, setHealthReports] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
   const [selectedReportDetail, setSelectedReportDetail] = useState(null);
+  const [selectedPrescriptionDetail, setSelectedPrescriptionDetail] = useState(null);
   const [file, setFile] = useState(null);
   const [reportDateTime, setReportDateTime] = useState(getCurrentDateTimeLocal);
   const [openReportModal, setOpenReportModal] = useState(false);
@@ -125,14 +129,16 @@ const ExecutivePage = ({ section = "attendance" }) => {
         toast.error("Enter patient ID");
         return;
       }
-      const [p, r, hr] = await Promise.all([
+      const [p, r, hr, rx] = await Promise.all([
         executivePatientApi(patientId),
         executivePatientReportsApi(patientId),
         executivePatientHealthReportsApi(patientId),
+        executivePatientPrescriptionsApi(patientId),
       ]);
       setPatient(p);
       setReports(r);
       setHealthReports(hr);
+      setPrescriptions(rx);
       toast.success("Patient loaded");
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to load patient");
@@ -478,7 +484,7 @@ const ExecutivePage = ({ section = "attendance" }) => {
                       </div>
                       <button
                         type="button"
-                        className="mt-6 h-12 rounded-2xl border border-slate-300 px-4 font-medium text-[#1f3f75] transition hover:border-[#1f3f75] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="mt-6 h-12 rounded-2xl border border-red-200 px-4 font-medium text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={healthReportForm.tests.length === 1}
                         onClick={() =>
                           setHealthReportForm((prev) => ({
@@ -494,7 +500,7 @@ const ExecutivePage = ({ section = "attendance" }) => {
                       </button>
                     </div>
                   ))}
-                  <button type="button" className="rounded-2xl border border-slate-300 px-4 py-3" onClick={() => setHealthReportForm((prev) => ({ ...prev, tests: [...prev.tests, { test_name: "", result: "", unit: "", range: "", level: "normal" }] }))}>
+                  <button type="button" className="rounded-2xl border border-green-200 px-4 py-3 text-green-600 transition hover:border-green-300 hover:bg-green-50" onClick={() => setHealthReportForm((prev) => ({ ...prev, tests: [...prev.tests, { test_name: "", result: "", unit: "", range: "", level: "normal" }] }))}>
                     Add Test Row
                   </button>
                   <label className="block text-sm font-medium text-slate-700">Notes</label>
@@ -523,6 +529,33 @@ const ExecutivePage = ({ section = "attendance" }) => {
                     Save Health Report
                   </button>
                 </div>
+              </div>
+
+              <div className="glass-panel interactive-card rounded-[28px] p-5 xl:col-span-2">
+                <DataTable
+                  title="Prescription History"
+                  data={prescriptions}
+                  searchPlaceholder="Search prescription history"
+                  searchKeys={["doctor_name", "prescription_date", "notes", "medicines"]}
+                  emptyMessage="No prescriptions found for this patient."
+                  columns={[
+                    { header: "Doctor", accessor: "doctor_name" },
+                    { header: "Prescription Date", render: (row) => formatDateTime(row.prescription_date) },
+                    { header: "Notes", render: (row) => row.notes || "No notes" },
+                    { header: "Medicines", render: (row) => row.medicines || "No medicines listed" },
+                    {
+                      header: "View",
+                      render: (row) => (
+                        <button
+                          className="rounded-xl bg-[#1f3f75] px-3 py-1.5 text-xs text-white transition hover:bg-[#19345f]"
+                          onClick={() => setSelectedPrescriptionDetail(row)}
+                        >
+                          View
+                        </button>
+                      ),
+                    },
+                  ]}
+                />
               </div>
 
               <div className="glass-panel interactive-card rounded-[28px] p-5 xl:col-span-2">
@@ -957,7 +990,11 @@ const ExecutivePage = ({ section = "attendance" }) => {
             onChange={(e) => setReportDateTime(e.target.value)}
           />
           <label className="block text-sm font-medium text-slate-700">Report File</label>
-          <input type="file" onChange={(e) => { setFile(e.target.files?.[0] || null); setReportErrors((prev) => ({ ...prev, file: "" })); }} />
+          <input
+            type="file"
+            accept=".pdf,image/*"
+            onChange={(e) => { setFile(e.target.files?.[0] || null); setReportErrors((prev) => ({ ...prev, file: "" })); }}
+          />
           {reportErrors.file && <p className="text-sm text-red-600">{reportErrors.file}</p>}
           <button
             className="rounded-2xl bg-gradient-to-r from-[#1f3f75] to-[#2d5daa] px-4 py-3 text-white"
@@ -1029,6 +1066,11 @@ const ExecutivePage = ({ section = "attendance" }) => {
         open={Boolean(selectedReportDetail)}
         report={selectedReportDetail}
         onClose={() => setSelectedReportDetail(null)}
+      />
+      <PrescriptionDetailModal
+        open={Boolean(selectedPrescriptionDetail)}
+        prescription={selectedPrescriptionDetail}
+        onClose={() => setSelectedPrescriptionDetail(null)}
       />
     </AppShell>
   );

@@ -14,7 +14,26 @@ const {
 const { generateOtp } = require("../../utils/otp");
 
 const router = express.Router();
-const upload = multer({ dest: path.resolve(process.env.UPLOAD_DIR || "uploads") });
+const allowedReportMimeTypes = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/svg+xml",
+]);
+
+const upload = multer({
+  dest: path.resolve(process.env.UPLOAD_DIR || "uploads"),
+  fileFilter: (_req, file, cb) => {
+    if (!allowedReportMimeTypes.has(String(file.mimetype || "").toLowerCase())) {
+      return cb(new Error("Only image files or PDF reports are allowed"));
+    }
+    cb(null, true);
+  },
+});
 router.use(authenticate, allowRoles("executive"));
 
 const normalizeTime = (value) => {
@@ -607,6 +626,22 @@ router.get("/patients/:id/health-reports", async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       "SELECT * FROM health_reports WHERE patient_id = ? ORDER BY report_date DESC, id DESC",
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/patients/:id/prescriptions", async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT pr.*, d.name AS doctor_name
+       FROM prescriptions pr
+       JOIN users d ON d.id = pr.doctor_id
+       WHERE pr.patient_id = ?
+       ORDER BY pr.prescription_date DESC, pr.id DESC`,
       [req.params.id]
     );
     res.json(rows);

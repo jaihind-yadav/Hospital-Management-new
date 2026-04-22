@@ -117,6 +117,21 @@ export const validateReportUpload = ({ patientId, file }) => {
   const errors = {};
   if (!isPositiveNumber(patientId)) errors.patientId = "Enter a valid patient ID.";
   if (!file) errors.file = "Please choose a report file.";
+  if (file) {
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/bmp",
+      "image/svg+xml",
+    ];
+    if (!allowedTypes.includes(String(file.type || "").toLowerCase())) {
+      errors.file = "Only image files or PDF reports are allowed.";
+    }
+  }
   return errors;
 };
 
