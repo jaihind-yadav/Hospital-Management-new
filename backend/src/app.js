@@ -10,10 +10,19 @@ const { errorHandler } = require("./middlewares/errorHandler");
 const { responseDateFormatter } = require("./middlewares/responseDateFormatter");
 
 const app = express();
+const allowedOrigins = String(process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:4200")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("CORS origin not allowed"));
+    },
     credentials: true,
   })
 );
@@ -72,7 +81,10 @@ app.get("/uploads/:filename", async (req, res, next) => {
 
     res.removeHeader("X-Frame-Options");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    res.setHeader("Content-Security-Policy", "frame-ancestors 'self' http://localhost:5173");
+    res.setHeader(
+      "Content-Security-Policy",
+      `frame-ancestors 'self' ${allowedOrigins.join(" ")}`
+    );
     res.type(mimeType);
     res.setHeader("Content-Disposition", `inline; filename="${report?.file_name || safeFilename}"`);
     res.sendFile(absoluteFilePath);

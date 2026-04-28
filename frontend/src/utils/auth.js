@@ -3,6 +3,11 @@ export const getStoredUser = () => {
   return raw ? JSON.parse(raw) : null;
 };
 
+export const clearStoredAuth = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+};
+
 export const roleHomeRoute = (role) => {
   if (role === "super_admin") return "/super-admin";
   if (role === "admin") return "/doctor";
